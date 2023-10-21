@@ -2,15 +2,18 @@ import time
 import logging
 import traceback
 import re
+from sqlalchemy.sql import text
 
 from sqlalchemy.exc import IntegrityError
+from celery.exceptions import SoftTimeLimitExceeded
 
 from augur.tasks.github.util.github_api_key_handler import GithubApiKeyHandler
 
 from augur.tasks.init.celery_app import celery_app as celery
 from augur.tasks.init.celery_app import AugurCoreRepoCollectionTask
 from augur.application.db.data_parse import *
-from augur.tasks.github.util.github_paginator import GithubPaginator, hit_api
+from augur.tasks.github.util.github_paginator import GithubPaginator, hit_api, process_dict_response, GithubApiResult
+from augur.tasks.github.util.util import parse_json_response
 from augur.tasks.github.util.github_task_session import GithubTaskManifest
 from augur.application.db.session import DatabaseSession
 from augur.tasks.github.util.util import add_key_value_pair_to_dicts, get_owner_repo
@@ -233,3 +236,117 @@ def is_valid_pr_block(issue):
         'pull_request' in issue and issue['pull_request']
         and isinstance(issue['pull_request'], dict) and 'url' in issue['pull_request']
     )
+
+@celery.task(soft_time_limit=2500, time_limit=2800)
+def resolve_closed_issues():
+
+    logger = logging.getLogger(resolve_closed_issues.__name__) 
+
+    try:
+
+        with GithubTaskManifest(logger) as manfiest:
+
+            key_auth = manfiest.key_auth
+            augur_db = manfiest.augur_db
+
+
+            query = text("""
+                SELECT i.issue_url
+                FROM issues i
+                JOIN (
+                    SELECT repo_id, COUNT(*) as issue_count
+                    FROM issues
+                    WHERE cntrb_id IS NULL AND issue_state = 'closed'
+                    GROUP BY repo_id
+                ) counts ON i.repo_id = counts.repo_id
+                JOIN repo r ON i.repo_id = r.repo_id
+                WHERE i.cntrb_id IS NULL AND i.issue_state = 'closed'
+                ORDER BY counts.issue_count ASC;
+            """)
+
+            result = augur_db.fetchall_data_from_sql_text(query)
+
+            # result = result[227:]
+            import random
+            random.shuffle(result)
+
+            i = 0
+
+            success = []
+            fail = []
+           
+            for row in result:
+
+
+                if i == 20:
+                    break
+
+                issue_url = row["issue_url"]
+
+                if "sqlalchemy" in issue_url:
+                    continue
+
+                               
+                response = hit_api(key_auth, issue_url, logger)
+                page_data = parse_json_response(logger, response)
+
+                state = page_data["state"]
+                closed_by = page_data["closed_by"]
+
+                print(f"Has closed by contributor: {closed_by is not None}. Url: {issue_url}")
+                if closed_by:
+                    success.append(issue_url)
+
+                else:
+                    fail.append((issue_url, page_data["locked"], page_data["state_reason"]))
+                # if closed_by:
+                #     print("\n\n\n\n\n This is it \n\n\n\n\n")
+
+                # print(state, closed_by, issue_url)
+
+                i+= 1
+
+            print("\n\nSuccess")
+            for val in success:
+                print(val)
+
+            print("\n\nFail")
+            for val in fail:
+                print(val)
+
+            # for issue in issues:
+                
+            #     issue_number = issue["issue_number"]
+
+            #     url = f"https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}"
+
+            #     response = hit_api(key_auth, url, logger)
+
+            #     page_data = parse_json_response(logger, response)
+            #     result = process_dict_response(logger, response, page_data)
+            #     if result in (GithubApiResult.RATE_LIMIT_EXCEEDED, GithubApiResult.SECONDARY_RATE_LIMIT, GithubApiResult):
+            #         attempts += 1
+            #         continue
+            #     elif result == GithubApiResult.SUCCESS and response.status_code == 200:
+            #         contributor = page_data["closed_by"]
+            #         if contributor:
+            #             closed_by_cntrb = extract_needed_contributor_data(contributor, tool_source, tool_version, data_source)
+            #             contibutors.append(closed_by_cntrb)
+                        
+    except SoftTimeLimitExceeded:
+        print("Issue resolving task time limit met exiting...")
+
+
+def process_issue_closed_contributor(issue):
+
+    contributors = []
+
+    issue_closed_cntrb = extract_needed_contributor_data(issue["closed_by"], tool_source, tool_version, data_source)
+    issue["cntrb_id"] = issue_closed_cntrb["cntrb_id"]
+    contributors.append(issue_closed_cntrb)
+
+    for assignee in issue["assignees"]:
+
+        issue_assignee_cntrb = extract_needed_contributor_data(assignee, tool_source, tool_version, data_source)
+        assignee["cntrb_id"] = issue_assignee_cntrb["cntrb_id"]
+        contributors.append(issue_assignee_cntrb)
