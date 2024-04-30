@@ -165,7 +165,7 @@ def start_celery_worker_processes(vmem_cap_ratio, disable_collection=False):
         sleep_time += 6
 
         #60% of estimate, Maximum value of 45
-        core_num_processes = determine_worker_processes(.1, 5)
+        core_num_processes = determine_worker_processes(.1, 1)
         logger.info(f"Starting core worker processes with concurrency={core_num_processes}")
         core_worker = f"celery -A augur.tasks.init.celery_app.celery_app worker -l info --concurrency={core_num_processes} -n core:{uuid.uuid4().hex}@%h"
         process_list.append(subprocess.Popen(core_worker.split(" ")))
@@ -179,7 +179,7 @@ def start_celery_worker_processes(vmem_cap_ratio, disable_collection=False):
         sleep_time += 6
 
         #15% of estimate, Maximum value of 20
-        facade_num_processes = determine_worker_processes(.15, 10)
+        facade_num_processes = determine_worker_processes(.15, 1)
         logger.info(f"Starting facade worker processes with concurrency={facade_num_processes}")
         facade_worker = f"celery -A augur.tasks.init.celery_app.celery_app worker -l info --concurrency={facade_num_processes} -n facade:{uuid.uuid4().hex}@%h -Q facade"
         

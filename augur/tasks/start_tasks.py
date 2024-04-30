@@ -251,7 +251,7 @@ def augur_collection_monitor(self):
         
         if secondary_repo_collect_phase.__name__ in enabled_phase_names:
             enabled_collection_hooks.append(build_secondary_repo_collect_request(session,enabled_phase_names))
-            #start_secondary_collection(session, max_repo=10)
+            #start_secondary_collection(session, max_repo=100)
 
         if facade_phase.__name__ in enabled_phase_names:
             #start_facade_collection(session, max_repo=30)
