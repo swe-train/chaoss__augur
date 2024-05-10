@@ -97,6 +97,10 @@ def retrieve_all_pr_and_issue_messages(repo_git: str, logger, key_auth, task_nam
     """
 
     # Draft SQL Alchemy version. I just don't know where and how to get a session in the new architecture
+    # All existing instances we have to do updates, and go through all the PRs and messages
+    # Once all the data is "there", at that point the GH API gives us an "updated_at" field
+    # Long term: Sort by updated_at and only do recollection if the PR is updated since then
+    # That will consistently be up to date. When PRs are closed they are read only unless they get reopened
     message_session = application.db.get_session()
 
     pr_query = (
