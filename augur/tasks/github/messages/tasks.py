@@ -45,17 +45,53 @@ def retrieve_all_pr_and_issue_messages(repo_git: str, logger, key_auth, task_nam
     owner, repo = get_owner_repo(repo_git)
 
     # url to get issue and pull request comments
+    # this would probably be replaced
     url = f"https://api.github.com/repos/{owner}/{repo}/issues/comments"
 
     # define logger for task
     logger.info(f"Collecting github comments for {owner}/{repo}")
 
+    # This seems like a duplicate of what is above
     # url to get issue and pull request comments
-    url = f"https://api.github.com/repos/{owner}/{repo}/issues/comments"
+    #url = f"https://api.github.com/repos/{owner}/{repo}/issues/comments"
 
     # define database task session, that also holds authentication keys the GithubPaginator needs
-    
+
+    # HERE is where I think we would get all the data from this query and iterate over it for messages    
+    ## < -------------- New Logic Here -------------->
+    """Core SQL
+    select repo_id, message_url from (
+        select repo_id, pr_comments_url as message_url, 'pr' as type, pr_created_at as creation_date, pr_src_number as gh_number
+        from pull_requests where repo_id=1 
+        and pr_src_state != 'open' --order by pr_created_at desc, pr_src_id desc
+        union 
+        select repo_id, comments_url as message_url, 'issue' as type, created_at as creation_date, gh_issue_number as gh_number 
+        from issues where repo_id=1 
+        and issue_state != 'open' --order by created_at desc, gh_issue_number desc; 
+        order by creation_date desc, gh_number desc
+    ); 
+    """
+
+    # I think we could possibly have some logic to check how many messages there are already, and skip it if the API returns the same count
+    """
+    select pull_requests.repo_id, pr_comments_url as message_url, 'pr' as type, pr_created_at as creation_date, pr_src_number as gh_number, coalesce(COUNT(pull_request_message_ref.msg_id))  as existing_messages 
+    from pull_requests
+    left outer join pull_request_message_ref  on pull_requests.repo_id=pull_request_message_ref.repo_id and pull_requests.pull_request_id=pull_request_message_ref.pull_request_id
+    where pull_requests.repo_id=1 
+    and pull_requests.pr_src_state != 'open' 
+    group by pull_requests.repo_id, message_url, type, creation_date, gh_number, pr_src_id --order by pr_created_at desc, pr_src_id desc 
+    union 
+    select issues.repo_id, comments_url as message_url, 'issue' as type, created_at as creation_date, gh_issue_number as gh_number, coalesce(COUNT(issue_message_ref.msg_id))  as existing_messages 
+    from issues
+    left outer join issue_message_ref  on issues.repo_id=issue_message_ref.repo_id and issues.issue_id=issue_message_ref.issue_id
+    where issues.repo_id=1 
+    and issues.issue_state != 'open' 
+    group by issues.repo_id, message_url, type, creation_date, gh_number, gh_issue_number --order by created_at desc, gh_issue_number desc 
+    order by creation_date desc, gh_number desc     
+    """
+
     # returns an iterable of all issues at this url (this essentially means you can treat the issues variable as a list of the issues)
+    ## < -------------- The Section below could be indented and run for each pr or issue -------------->
     messages = GithubPaginator(url, key_auth, logger)
 
     num_pages = messages.get_num_pages()
