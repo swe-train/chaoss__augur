@@ -90,6 +90,46 @@ def retrieve_all_pr_and_issue_messages(repo_git: str, logger, key_auth, task_nam
     order by creation_date desc, gh_number desc     
     """
 
+    # Draft SQL Alchemy version. I just don't know where and how to get a session in the new architecture
+    """ 
+    augur_db.
+    pr_query = (
+        session.query(
+            PullRequest.repo_id,
+            PullRequest.pr_comments_url.label('message_url'),
+            func.literal('pr').label('type'),
+            PullRequest.pr_created_at.label('creation_date'),
+            PullRequest.pr_src_number.label('gh_number'),
+            func.coalesce(func.count(PullRequestMessageRef.msg_id), 0).label('existing_messages')
+        )
+        .outerjoin(PullRequestMessageRef, (PullRequest.repo_id == PullRequestMessageRef.repo_id) &
+                (PullRequest.pull_request_id == PullRequestMessageRef.pull_request_id))
+        .filter(PullRequest.repo_id == 1, PullRequest.pr_src_state != 'open')
+        .group_by(PullRequest.repo_id, 'message_url', 'type', 'creation_date', 'gh_number')
+    )
+
+    issue_query = (
+        session.query(
+            Issue.repo_id,
+            Issue.comments_url.label('message_url'),
+            func.literal('issue').label('type'),
+            Issue.created_at.label('creation_date'),
+            Issue.gh_issue_number.label('gh_number'),
+            func.coalesce(func.count(IssueMessageRef.msg_id), 0).label('existing_messages')
+        )
+        .outerjoin(IssueMessageRef, (Issue.repo_id == IssueMessageRef.repo_id) &
+                (Issue.issue_id == IssueMessageRef.issue_id))
+        .filter(Issue.repo_id == 1, Issue.issue_state != 'open')
+        .group_by(Issue.repo_id, 'message_url', 'type', 'creation_date', 'gh_number')
+    )
+
+    combined_query = union_all(pr_query, issue_query).order_by('creation_date desc', 'gh_number desc')
+
+    # Executing the query
+    result = combined_query.all()
+    for row in result:
+        print(row)
+    """
     # returns an iterable of all issues at this url (this essentially means you can treat the issues variable as a list of the issues)
     ## < -------------- The Section below could be indented and run for each pr or issue -------------->
     messages = GithubPaginator(url, key_auth, logger)
