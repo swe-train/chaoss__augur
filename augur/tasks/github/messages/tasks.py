@@ -129,6 +129,13 @@ def retrieve_all_pr_and_issue_messages(repo_git: str, logger, key_auth, task_nam
     result = combined_query.all()
     for row in result:
         print(row)
+        # for each row in the result, go get the related messages
+        # call GH API for each PR or Issue (a row)
+        # Check message count against message count row (api call)
+        # If different:   
+        #    process all the messages as before (logic): 
+        # else: 
+        #    keep going without doing anything 
     """
     # returns an iterable of all issues at this url (this essentially means you can treat the issues variable as a list of the issues)
     ## < -------------- The Section below could be indented and run for each pr or issue -------------->
