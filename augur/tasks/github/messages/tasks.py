@@ -1,6 +1,12 @@
 import logging
 
 
+from augur import application
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.sql import union_all
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey, func
+
 from augur.tasks.init.celery_app import celery_app as celery
 from augur.tasks.init.celery_app import AugurCoreRepoCollectionTask
 from augur.application.db.data_parse import *
@@ -91,10 +97,10 @@ def retrieve_all_pr_and_issue_messages(repo_git: str, logger, key_auth, task_nam
     """
 
     # Draft SQL Alchemy version. I just don't know where and how to get a session in the new architecture
-    """ 
-    augur_db.
+    message_session = application.db.get_session()
+
     pr_query = (
-        session.query(
+        message_session.query(
             PullRequest.repo_id,
             PullRequest.pr_comments_url.label('message_url'),
             func.literal('pr').label('type'),
@@ -109,7 +115,7 @@ def retrieve_all_pr_and_issue_messages(repo_git: str, logger, key_auth, task_nam
     )
 
     issue_query = (
-        session.query(
+        message_session.query(
             Issue.repo_id,
             Issue.comments_url.label('message_url'),
             func.literal('issue').label('type'),
@@ -136,7 +142,7 @@ def retrieve_all_pr_and_issue_messages(repo_git: str, logger, key_auth, task_nam
         #    process all the messages as before (logic): 
         # else: 
         #    keep going without doing anything 
-    """
+
     # returns an iterable of all issues at this url (this essentially means you can treat the issues variable as a list of the issues)
     ## < -------------- The Section below could be indented and run for each pr or issue -------------->
     messages = GithubPaginator(url, key_auth, logger)
