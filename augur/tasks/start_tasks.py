@@ -153,7 +153,7 @@ def non_repo_domain_tasks(self):
     tasks.apply_async()
 
 
-def build_primary_repo_collect_request(session,enabled_phase_names, days_until_collect_again = 1):
+def build_primary_repo_collect_request(session,enabled_phase_names, days_until_collect_again = 21):
     #Add all required tasks to a list and pass it to the CollectionRequest
     primary_enabled_phases = []
     primary_gitlab_enabled_phases = []
@@ -172,11 +172,11 @@ def build_primary_repo_collect_request(session,enabled_phase_names, days_until_c
     primary_enabled_phases.append(core_task_success_util_gen)
     primary_gitlab_enabled_phases.append(core_task_success_util_gen)
 
-    primary_request = CollectionRequest("core",primary_enabled_phases,max_repo=40, days_until_collect_again=7, gitlab_phases=primary_gitlab_enabled_phases)
+    primary_request = CollectionRequest("core",primary_enabled_phases,max_repo=40, days_until_collect_again=21, gitlab_phases=primary_gitlab_enabled_phases)
     primary_request.get_valid_repos(session)
     return primary_request
 
-def build_secondary_repo_collect_request(session,enabled_phase_names, days_until_collect_again = 1):
+def build_secondary_repo_collect_request(session,enabled_phase_names, days_until_collect_again = 21):
     #Deal with secondary collection
     secondary_enabled_phases = []
 
@@ -190,13 +190,13 @@ def build_secondary_repo_collect_request(session,enabled_phase_names, days_until
         return secondary_task_success_util.si(repo_git)
 
     secondary_enabled_phases.append(secondary_task_success_util_gen)
-    request = CollectionRequest("secondary",secondary_enabled_phases,max_repo=10, days_until_collect_again=10)
+    request = CollectionRequest("secondary",secondary_enabled_phases,max_repo=10, days_until_collect_again=40)
 
     request.get_valid_repos(session)
     return request
 
 
-def build_facade_repo_collect_request(session,enabled_phase_names, days_until_collect_again = 1):
+def build_facade_repo_collect_request(session,enabled_phase_names, days_until_collect_again = 21):
     #Deal with facade collection
     facade_enabled_phases = []
 
@@ -212,12 +212,12 @@ def build_facade_repo_collect_request(session,enabled_phase_names, days_until_co
 
     facade_enabled_phases.append(facade_task_update_weight_util_gen)
 
-    request = CollectionRequest("facade",facade_enabled_phases,max_repo=30, days_until_collect_again=7)
+    request = CollectionRequest("facade",facade_enabled_phases,max_repo=30, days_until_collect_again=21)
 
     request.get_valid_repos(session)
     return request
 
-def build_ml_repo_collect_request(session,enabled_phase_names, days_until_collect_again = 1):
+def build_ml_repo_collect_request(session,enabled_phase_names, days_until_collect_again = 21):
     ml_enabled_phases = []
 
     ml_enabled_phases.append(machine_learning_phase)
@@ -227,7 +227,7 @@ def build_ml_repo_collect_request(session,enabled_phase_names, days_until_collec
 
     ml_enabled_phases.append(ml_task_success_util_gen)
 
-    request = CollectionRequest("ml",ml_enabled_phases,max_repo=5, days_until_collect_again=10)
+    request = CollectionRequest("ml",ml_enabled_phases,max_repo=5, days_until_collect_again=21)
     request.get_valid_repos(session)
     return request
 
